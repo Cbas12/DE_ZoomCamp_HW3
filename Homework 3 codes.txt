@@ -1,0 +1,58 @@
+-- Creating external table referring to gcs path
+CREATE OR REPLACE EXTERNAL TABLE `spatial-vision-412003.ny_taxi.external_green_taxi_2022`
+OPTIONS (
+  format = 'PARQUET',
+  uris = ['gs://green_taxi_cbas/parquets_2022/*.parquet']
+);
+
+--Check green taxi 2022
+SELECT * FROM spatial-vision-412003.ny_taxi.external_green_taxi_2022 limit 1000;
+
+-- Create a non partitioned table from external table
+CREATE OR REPLACE TABLE spatial-vision-412003.ny_taxi.green_taxi_2022_non_partitoned AS
+SELECT * FROM spatial-vision-412003.ny_taxi.external_green_taxi_2022;
+
+-- Create a partitioned table from external table
+CREATE OR REPLACE TABLE spatial-vision-412003.ny_taxi.green_taxi_2022_partitoned
+PARTITION BY
+  DATE(lpep_pickup_datetime) AS
+SELECT * FROM spatial-vision-412003.ny_taxi.external_green_taxi_2022;
+
+-- Creating a partition and cluster table
+CREATE OR REPLACE TABLE spatial-vision-412003.ny_taxi.green_taxi_2022_partitoned_clustered
+PARTITION BY DATE(lpep_pickup_datetime)
+CLUSTER BY PULocationID AS
+SELECT * FROM spatial-vision-412003.ny_taxi.external_green_taxi_2022;
+
+
+--=======================================================================================================================================
+
+-- QUESTION 1: CHECK ROWS
+SELECT count(*) FROM spatial-vision-412003.ny_taxi.external_green_taxi_2022;
+
+
+-- Question 2: Compare estimated amount of data read in extenal and local NON partitioned
+SELECT COUNT(DISTINCT PULocationID) FROM spatial-vision-412003.ny_taxi.external_green_taxi_2022;
+SELECT COUNT(DISTINCT PULocationID) FROM spatial-vision-412003.ny_taxi.green_taxi_2022_non_partitoned;
+
+
+-- Question 3: How many records have a fare_amount of 0?
+SELECT COUNT(*) FROM spatial-vision-412003.ny_taxi.green_taxi_2022_non_partitoned WHERE fare_amount=0;
+
+
+-- Question 5: Compare estimated processed bytes of the tablas
+--TEST NON PARTITIONED
+SELECT COUNT(DISTINCT PULocationID),MIN(lpep_pickup_datetime),MAX(lpep_pickup_datetime) FROM spatial-vision-412003.ny_taxi.green_taxi_2022_non_partitoned
+WHERE lpep_pickup_datetime BETWEEN '2022-06-01' AND '2022-07-01';
+--TEST PARTITIONED AND CLUSTERED
+SELECT COUNT(DISTINCT PULocationID),MIN(lpep_pickup_datetime),MAX(lpep_pickup_datetime) FROM spatial-vision-412003.ny_taxi.green_taxi_2022_partitoned_clustered
+WHERE lpep_pickup_datetime BETWEEN '2022-06-01' AND '2022-07-01';
+
+
+-- Question 8: Estimating bytes
+SELECT count(*) FROM spatial-vision-412003.ny_taxi.green_taxi_2022_non_partitoned;
+
+SELECT count(*) FROM spatial-vision-412003.ny_taxi.green_taxi_2022_partitoned_clustered;
+
+SELECT * FROM `ny_taxi.INFORMATION_SCHEMA.MATERIALIZED_VIEWS`
+--WHERE table_name = 'green_taxi_2022_non_partitoned'
